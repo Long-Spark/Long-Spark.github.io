@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LongSpark</title>
+<meta name="description" content="LongSpark: a block-diffusion drafter whose per-round cost stays flat from 1K to 128K tokens.">
+<link rel="canonical" href="https://long-spark.github.io/">
+<meta property="og:title" content="LongSpark: drafting at a fixed cost">
+<meta property="og:description" content="A block-diffusion drafter whose per-round cost stays flat from 1K to 128K tokens.">
+<meta property="og:url" content="https://long-spark.github.io/">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+:root{
+  --bg:#faf9f7; --card:#ffffff; --fg:#1a1714; --muted:#57524b; --faint:#8a8178;
+  --border:#e2ddd3; --soft:#f3f0ea; --code-bg:#f4f1ec;
+  --ls:#2c6e9a; --ls-2:#4b8fbc; --ls-fill:#e3eef6; --ls-faint:#eef5fa;
+  --base:#9d968d; --base-2:#cbc5bc; --base-fill:#ece8e1;
+  --vb:#b7791f; --vw:#2f7fc1; --vs:#c2477f;
+  --vb-fill:#f7ecd9; --vw-fill:#e2eef8; --vs-fill:#f8e4ed;
+  --ok:#3f8f5f; --ok-fill:#e3f1e8; --bad:#c2453d; --bad-fill:#f8e2df;
+  --tgt:#1a1714; --tgt-fg:#faf9f7; --arrow:#a39c92;
+  --s1:#304d85; --s2:#2878b8; --s3:#82a6d5; --s4:#bed4e9;
+  --c4b:#6aa6d6; --c8b:#2c6e9a; --c14b:#1f3a66;
+  --mask-a:#e9e5de; --mask-b:#f6f3ee;
+  --shadow:0 1px 2px rgba(26,23,20,.05),0 4px 16px rgba(26,23,20,.04);
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --math:"STIX Two Text","Cambria Math","Times New Roman",serif;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#1a1714; --card:#211d19; --fg:#f3f0ea; --muted:#a39a90; --faint:#7d756c;
+  --border:#3a342e; --soft:#27231f; --code-bg:#181513;
+  --ls:#7fb6de; --ls-2:#5d9ccb; --ls-fill:#1f3342; --ls-faint:#1c2730;
+  --base:#8a8279; --base-2:#5b554e; --base-fill:#2d2925;
+  --vb:#b98a32; --vw:#4f98d6; --vs:#d86a9c;
+  --vb-fill:#35291a; --vw-fill:#1a2d3e; --vs-fill:#3a1f2c;
+  --ok:#6ebe96; --ok-fill:#1f3329; --bad:#e08b83; --bad-fill:#3b2320;
+  --tgt:#f3f0ea; --tgt-fg:#1a1714; --arrow:#6f675e;
+  --s1:#bcd3ef; --s2:#7fb0e0; --s3:#4a80b8; --s4:#2d557f;
+  --c4b:#9ecbf0; --c8b:#5d9ccb; --c14b:#3a6ea6;
+  --mask-a:#2e2a26; --mask-b:#24201c;
+  --shadow:none;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);
+  font-size:1.02rem;line-height:1.75;padding-inline:20px;padding-block:0 64px;
+  font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased}
+a{color:var(--ls);text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--ls) 45%,transparent);text-underline-offset:3px}
+a:hover{text-decoration-color:var(--ls)}
+:focus-visible{outline:2px solid var(--ls);outline-offset:2px;border-radius:2px}
+button,input{font:inherit;color:inherit}
+
+/* ---------- chrome ---------- */
+.nav{max-width:680px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding-block:22px;gap:16px}
+.brand{font-weight:600;letter-spacing:-.02em;text-decoration:none;color:var(--fg);display:flex;align-items:center;gap:8px}
+.brand svg{width:18px;height:18px}
+.nav-links{display:flex;gap:18px;font-size:.85rem}
+.nav-links a{color:var(--muted);text-decoration:none}
+.nav-links a:hover{color:var(--fg)}
+.nav-links{align-items:center}
+.theme-btn{display:inline-grid;place-items:center;width:28px;height:28px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--muted);cursor:pointer;padding:0}
+.theme-btn:hover{color:var(--fg);border-color:var(--faint)}
+.theme-btn svg{width:14px;height:14px}
+.theme-btn .sun{display:none}
+:root[data-theme="dark"] .theme-btn .sun{display:block}
+:root[data-theme="dark"] .theme-btn .moon{display:none}
+
+/* ---------- outline ---------- */
+.toc{position:fixed;top:120px;left:max(16px,calc(50% - 340px - 244px));width:212px;font-size:.78rem;line-height:1.45;display:none}
+.toc ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--border)}
+.toc li{margin:0}
+.toc a{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 0 4px 14px;margin-left:-1px;border-left:1px solid transparent;color:var(--faint);text-decoration:none;transition:color .2s,border-color .2s}
+.toc a:hover{color:var(--muted)}
+.toc a.on{color:var(--fg);border-left-color:var(--ls)}
+@media (min-width:1200px){.toc{display:block}}
+
+.col{max-width:680px;margin:0 auto}
+header.post{padding-top:56px}
+.kicker{font-family:var(--mono);font-size:.74rem;color:var(--faint);letter-spacing:.04em;text-transform:uppercase}
+h1{font-size:clamp(1.9rem,4.6vw,2.6rem);line-height:1.12;letter-spacing:-.035em;font-weight:650;margin:.5rem 0 .9rem;text-wrap:balance}
+.dek{font-size:1.14rem;color:var(--muted);line-height:1.55;margin:0 0 1.3rem;text-wrap:pretty}
+.byline{font-size:.86rem;color:var(--muted);line-height:1.6}
+.byline b{font-weight:500;color:var(--fg)}
+.byline sup{font-size:.68em;color:var(--faint)}
+.res{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:20px}
+.res a{display:inline-flex;align-items:center;gap:7px;font-size:.86rem;font-weight:500;text-decoration:none;color:var(--muted)}
+.res a:hover{color:var(--ls)}
+.res svg{width:15px;height:15px}
+
+.prose>p{margin-block:1.15rem;text-wrap:pretty}
+.prose h2{font-size:1.32rem;letter-spacing:-.025em;font-weight:620;margin:3.2rem 0 .6rem;line-height:1.3;text-wrap:balance}
+.prose h3{font-size:1.06rem;letter-spacing:-.02em;font-weight:600;margin:2.2rem 0 .3rem;text-wrap:balance}
+.prose h2 a,.prose h3 a{color:inherit;text-decoration:none}
+.prose h2 a:hover::after,.prose h3 a:hover::after{content:" #";color:var(--faint);font-weight:400}
+.prose strong{font-weight:600}
+.prose ul{padding-left:1.25rem;margin-block:1.1rem}
+.prose li{margin-block:.35rem}
+code,.tok-inline{font-family:var(--mono);font-size:.84em;background:var(--code-bg);padding:.08em .36em;border-radius:3px}
+.m{font-family:var(--math);font-size:1.08em;font-style:italic;white-space:nowrap}
+.m .r{font-style:normal}
+.m sub,.m sup{font-size:.7em}
+.eq{font-family:var(--math);font-size:1.12rem;text-align:center;margin:1.6rem 0;padding:.3rem 0;overflow-x:auto;white-space:nowrap}
+.eq i{font-style:italic}
+.eq .r{font-style:normal}
+.eq .frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .15em}
+.eq .frac>span:first-child{border-bottom:1px solid currentColor;padding:0 .3em .05em}
+.eq .frac>span:last-child{padding:.05em .3em 0}
+.eq .tag{float:right;font-family:var(--mono);font-size:.72rem;color:var(--faint);font-style:normal;margin-top:.5em}
+.v-b{color:var(--vb);font-weight:600}.v-w{color:var(--vw);font-weight:600}.v-s{color:var(--vs);font-weight:600}
+
+/* views legend-in-text */
+.views-list{list-style:none;padding:0!important;display:grid;gap:10px}
+.views-list li{display:grid;grid-template-columns:14px 1fr;gap:12px;margin:0}
+.views-list .dot{width:10px;height:10px;border-radius:2px;margin-top:.55em}
+
+/* ---------- figures ---------- */
+.fig{margin-block:2.4rem}
+.wide{max-width:680px;margin-inline:auto}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+figcaption{font-size:.84rem;color:var(--muted);line-height:1.6;margin-top:12px;max-width:680px;text-wrap:pretty}
+.wide figcaption{margin-inline:auto}
+figcaption .fn{font-family:var(--mono);font-size:.74rem;color:var(--fg);font-weight:600;margin-right:6px}
+.fig-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:16px}
+
+.btn{border:1px solid var(--border);background:var(--card);border-radius:5px;padding:5px 11px;font-size:.8rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.3}
+.btn:hover{border-color:var(--ls);color:var(--ls)}
+.btn[aria-pressed="true"]{background:var(--ls-fill);border-color:var(--ls);color:var(--ls)}
+.btn svg{width:12px;height:12px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:transparent;padding:5px 12px;font-size:.8rem;cursor:pointer;font-weight:500;color:var(--muted);border-right:1px solid var(--border)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ls-fill);color:var(--ls)}
+.seg button:hover{color:var(--fg)}
+
+.chart text{fill:var(--muted);font-family:var(--mono);font-size:13.5px}
+.chart .grid{stroke:var(--border);stroke-width:1}
+.chart .axis{stroke:var(--base-2);stroke-width:1}
+.chart .lbl{fill:var(--fg);font-family:var(--sans);font-size:15px;font-weight:600}
+.chart .ttl{fill:var(--fg);font-family:var(--sans);font-size:15.5px;font-weight:600}
+.tooltip{position:fixed;pointer-events:none;z-index:50;background:var(--card);color:var(--fg);border:1px solid var(--border);box-shadow:0 6px 24px rgba(0,0,0,.12);
+  border-radius:5px;padding:7px 10px;font-size:.76rem;line-height:1.45;font-family:var(--mono);max-width:260px;opacity:0;transition:opacity .12s}
+.tooltip.on{opacity:1}
+.tooltip b{font-family:var(--sans);font-weight:600}
+
+/* ---------- Fig 1: scaling ---------- */
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.ctl label{font-size:.82rem;font-weight:600}
+input[type=range]{accent-color:var(--ls);flex:1 1 220px;min-width:0}
+.ctx-out{font-family:var(--mono);font-size:.82rem;min-width:10.5ch;font-variant-numeric:tabular-nums}
+.charts2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px;border-top:1px solid var(--border);padding-top:16px}
+.charts2 svg{width:100%;height:auto;display:block;overflow:visible}
+.headline{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px;font-size:.84rem;color:var(--muted)}
+.headline b{font-family:var(--mono);font-size:1.05rem;color:var(--ls);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---------- Fig 2: round anatomy ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.76rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+#ch-round{width:100%;height:auto;display:block}
+
+/* ---------- Fig 3: architecture ---------- */
+#fig-arch .panel{padding:18px 18px 16px}
+#arch{width:100%;min-width:600px;height:auto;display:block}
+#arch text{font-family:var(--sans);font-size:11px;fill:var(--muted)}
+#arch .t-h{font-size:13.5px;font-weight:600;fill:var(--fg);letter-spacing:-.01em}
+#arch .t-s{font-family:var(--mono);font-size:10.5px;fill:var(--faint)}
+#arch .t-v{font-size:11.5px;font-weight:600}
+#arch .t-m{font-family:var(--mono);font-size:10.5px}
+#arch .pn{fill:var(--card);stroke:var(--border);stroke-width:1.2;transition:stroke .3s,fill .3s}
+#arch .pn-t{fill:var(--soft)}
+#arch .pn-d{fill:var(--ls-faint);stroke:color-mix(in oklab,var(--ls) 30%,var(--border))}
+#arch .bx{fill:var(--card);stroke:var(--border);stroke-width:1;transition:stroke .3s,stroke-width .3s}
+#arch .bx.b{stroke:color-mix(in oklab,var(--vb) 45%,var(--border))}
+#arch .bx.w{stroke:color-mix(in oklab,var(--vw) 45%,var(--border))}
+#arch .bx.s{stroke:color-mix(in oklab,var(--vs) 45%,var(--border))}
+#arch .bx.hot.b{stroke:var(--vb);stroke-width:2}
+#arch .bx.hot.w{stroke:var(--vw);stroke-width:2}
+#arch .bx.hot.s{stroke:var(--vs);stroke-width:2}
+#arch .bx.hot.d{stroke:var(--ls);stroke-width:2}
+#arch .cn{fill:none;stroke:var(--arrow);stroke-width:1.3}
+#arch .cn.b{stroke:var(--vb)}#arch .cn.w{stroke:var(--vw)}#arch .cn.s{stroke:var(--vs)}#arch .cn.d{stroke:var(--ls)}
+#arch .cn.live{stroke-width:1.8;stroke-dasharray:4 4;animation:dash .5s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-8}}
+#arch .kv{fill:var(--base-2);opacity:.6;transition:fill .4s,opacity .4s}
+#arch .kv.new{fill:var(--ok);opacity:1}
+#arch .tok{fill:var(--card);stroke:var(--ls);stroke-width:1.2;transition:fill .25s,stroke .25s,opacity .25s}
+#arch .tok.drafted{fill:var(--ls-fill)}
+#arch .tok.ok{fill:var(--ok);stroke:var(--ok)}
+#arch .tok.no{fill:var(--bad);stroke:var(--bad)}
+#arch .tok.tg{fill:var(--tgt);stroke:var(--tgt)}
+#arch .tok.off{opacity:.25}
+#arch .pre{fill:var(--base-2)}
+#arch .slot{stroke-width:1;transition:fill .25s,stroke .25s}
+#arch .slot.a{fill:var(--tgt);stroke:var(--tgt)}
+#arch .slot.m{fill:url(#hatch);stroke:var(--base-2);stroke-dasharray:2 2}
+#arch .slot.y{fill:var(--card);stroke:var(--border);stroke-dasharray:2 2}
+#arch .slot.y.on{fill:var(--ls-fill);stroke:var(--ls);stroke-dasharray:none}
+#arch .st{font-family:var(--mono);font-size:9px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+#arch .st.a{fill:var(--tgt-fg)}
+#arch .st.y{fill:var(--ls);opacity:0;transition:opacity .25s}
+#arch .st.y.on{opacity:1}
+#arch .bc{fill:var(--ls);opacity:.14;transition:opacity .25s}
+#arch .bc.on{opacity:.8}
+#arch .lnk{fill:none;stroke:var(--ls);stroke-width:1.2;opacity:0;transition:opacity .25s}
+#arch .lnk.on{opacity:.9}
+#arch .wcell{fill:var(--vw);transition:opacity .4s}
+#arch .wcell.new{fill:var(--ok)}
+#arch .scell{fill:var(--vs);transition:opacity .6s}
+#arch .lbl-bg{fill:var(--card)}
+.arch-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.steps{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.step-pill{font-size:.76rem;font-weight:500;padding:3px 10px;border-radius:999px;border:1px solid transparent;color:var(--faint);background:transparent;cursor:pointer;transition:all .2s}
+.step-pill:hover{color:var(--fg)}
+.step-pill.on{color:var(--ls);border-color:color-mix(in oklab,var(--ls) 40%,transparent);background:var(--ls-fill)}
+.narr{margin:10px 0 0;font-size:.86rem;line-height:1.6;color:var(--muted);min-height:3.3em}
+.narr b{color:var(--fg);font-weight:600}
+
+/* ---------- Fig 4: layer anatomy ---------- */
+.scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+
+/* ---------- results ---------- */
+.dual{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.dual svg{width:100%;height:auto;display:block}
+table{border-collapse:collapse;width:100%;font-size:.8rem;font-variant-numeric:tabular-nums}
+th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;font-size:.72rem;color:var(--muted);border-bottom:1px solid var(--fg)}
+thead tr.grp th{border-bottom:1px solid var(--border);text-align:center;color:var(--fg)}
+tbody tr.me{background:var(--ls-faint)}
+tbody tr.me td:first-child{color:var(--ls);font-weight:600}
+td b{font-weight:650}
+td .sp{color:var(--faint);font-family:var(--mono);font-size:.92em}
+td .sp.best{color:var(--ls);font-weight:600}
+.tbl-wrap{overflow-x:auto;margin-top:16px}
+details.more{margin-top:14px;font-size:.82rem}
+details.more summary{cursor:pointer;color:var(--ls);font-weight:500;width:fit-content}
+.tcell-bar{display:block;height:3px;background:var(--base-2);margin-top:3px;margin-left:auto;border-radius:2px}
+tr.me .tcell-bar{background:var(--ls)}
+caption{caption-side:top;text-align:left;font-size:.84rem;color:var(--muted);padding-bottom:10px;line-height:1.55}
+caption .fn{font-family:var(--mono);font-size:.74rem;color:var(--fg);font-weight:600;margin-right:6px}
+
+pre.bib{font-family:var(--mono);font-size:.76rem;line-height:1.6;background:var(--code-bg);border:1px solid var(--border);padding:14px 16px;overflow-x:auto;border-radius:4px;margin:0}
+.bib-wrap{position:relative;margin-top:1rem}
+.bib-wrap .btn{position:absolute;top:8px;right:8px}
+.footnotes{margin-top:3.5rem;font-size:.8rem;color:var(--muted);line-height:1.65;border-top:1px solid var(--border);padding-top:1rem}
+.footnotes ol{padding-left:1.2rem}
+.footnotes li{margin-block:.4rem}
+a.cite{text-decoration:none;font-family:var(--mono);font-size:.72em;color:var(--muted);margin-left:1px;vertical-align:.35em;line-height:0}
+a.cite:hover{color:var(--ls)}
+.refs-h{margin:1.6rem 0 .2rem;font-weight:600;color:var(--fg)}
+.footnotes ol.refs{list-style:none;padding-left:0;counter-reset:r}
+.refs li{counter-increment:r;padding-left:2.7em;text-indent:-2.7em;scroll-margin-top:80px}
+.refs li::before{content:'[' counter(r) ']';display:inline-block;width:2.7em;text-indent:0;font-family:var(--mono);font-size:.9em}
+.refs li:target{color:var(--fg)}
+.refs a{color:inherit}
+th a{color:inherit;text-decoration-color:var(--border)}
+sup.fnref a{text-decoration:none;font-family:var(--mono);font-size:.72em}
+.closing{font-size:1.05rem;font-weight:600;letter-spacing:-.015em;margin-top:2.2rem}
+footer.site{max-width:920px;margin:4rem auto 0;border-top:1px solid var(--border);padding-top:18px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:.78rem;color:var(--faint)}
+footer.site .mail{font-family:var(--mono);user-select:all;color:var(--muted)}
+
+/* ---------- responsive ---------- */
+@media (max-width:820px){
+}
+@media (max-width:620px){
+  body{padding-inline:16px}
+  .charts2,.dual{grid-template-columns:1fr}
+  .panel{padding:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Site">
+  <a class="brand" href="#top">
+    <svg viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="7" width="3" height="4" rx="1" fill="var(--vb)"/><rect x="6" y="3" width="3" height="12" rx="1" fill="var(--vw)"/><rect x="11" y="5" width="3" height="8" rx="1" fill="var(--vs)"/></svg>
+    LongSpark
+  </a>
+  <div class="nav-links">
+    <!-- TODO: replace with the arXiv abstract URL once assigned -->
+    <a href="#cite">Paper</a>
+    <a href="https://github.com/Hao-Yuan-He/LongSpark">Code</a>
+    <a href="https://huggingface.co/collections/Hehy/longspark">Weights</a>
+    <button class="theme-btn" id="theme" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+      <svg class="moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 10.2A6 6 0 015.8 2.5a6 6 0 107.7 7.7z" fill="currentColor"/></svg>
+      <svg class="sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</nav>
+
+<aside class="toc" aria-label="Outline"><ol id="toc"></ol></aside>
+
+<main id="top">
+<header class="post col">
+  <div class="kicker">September 28, 2026</div>
+  <h1>LongSpark: drafting at a fixed cost</h1>
+  <div class="byline">
+    <b>Hao-Yuan He</b><sup>*</sup>, <b>Peng-Fei Liu</b><sup>*</sup>
+    <br><span style="color:var(--faint)"><sup>*</sup>Equal contribution</span>
+  </div>
+  <div class="res">
+    <a href="https://github.com/Hao-Yuan-He/LongSpark"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Code</a>
+    <a href="https://huggingface.co/collections/Hehy/longspark"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 7h8M4 10h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Weights</a>
+    <a href="#cite"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9 1.5V5h4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Paper</a>
+  </div>
+</header>
+
+<article class="prose col">
+<p>Speculative decoding<a class="cite" href="#ref-1">[1]</a> strikes a simple bargain. A small drafter guesses a block of tokens, the target checks all of them in one forward pass, and every accepted guess is a token the target never had to produce on its own. The bargain pays exactly as long as guessing stays cheap.</p>
+
+<p>On long contexts, guessing quietly stops being cheap. Today’s strongest drafters read the entire prefix every round. At 32K tokens, DSpark<a class="cite" href="#ref-2">[2]</a> spends <strong>6.3&nbsp;ms</strong> drafting each block; at 128K it spends <strong>13.8&nbsp;ms</strong>, while its drafter state swells from 640&nbsp;MiB to <strong>2.5&nbsp;GiB per request</strong>. The drafter inherits the very <span class="m">O(t)</span> scaling it was meant to hide.</p>
+
+<p><strong>LongSpark</strong> removes that scaling entirely. It reads the prefix through three fixed-size views of the target’s own verification pass, so its drafting time sits near <strong>3.5&nbsp;ms</strong> from 1K to 128K tokens and its context state stays at <strong>6.3&nbsp;MiB</strong>, a <strong>406× reduction</strong> over DSpark at 128K. End to end, it delivers <strong>1.88×–2.13×</strong> throughput speedups on Qwen3-4B, 8B, and 14B, and the <strong>lowest time-per-output-token</strong> on every long-context workload we tested.</p>
+</article>
+
+<!-- ============ FIG 1 ============ -->
+<figure class="fig wide" id="fig-scale">
+  <div class="panel">
+    <div class="ctl">
+      <label for="ctx">Prefix length</label>
+      <input type="range" id="ctx" min="0" max="7" step="0.01" value="7" aria-describedby="ctx-out">
+      <output id="ctx-out" class="ctx-out" for="ctx">128K</output>
+      <button class="btn" id="sweep" type="button"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1.5v9l8-4.5z" fill="currentColor"/></svg>Sweep</button>
+    </div>
+    <div class="headline" aria-live="polite">
+      <span>Drafter state: <b id="hl-state">406×</b> smaller</span>
+      <span>Drafting: <b id="hl-lat">3.8×</b> faster</span>
+    </div>
+    <div class="charts2">
+      <svg id="ch-lat" class="chart" viewBox="0 0 420 230" role="img" aria-label="Drafting time (proposal plus sampling) versus prefix length. DSpark rises from 3.9 to 13.8 ms; LongSpark stays between 3.5 and 3.6 ms."></svg>
+      <svg id="ch-mem" class="chart" viewBox="0 0 420 230" role="img" aria-label="Drafter context state versus prefix length on a log scale. DSpark grows linearly from 20 to 2560 MiB; LongSpark stays at 6.3 MiB."></svg>
+    </div>
+  </div>
+  <figcaption><span class="fn">Fig. 1</span>Drag the prefix length. DSpark’s drafting time (proposal plus sampling) and state grow with the prefix; LongSpark’s stay flat. Measured on Qwen3-8B, target on four GPUs (TP4).</figcaption>
+</figure>
+
+<article class="prose col">
+<h2 id="useful"><a href="#useful">A drafter only has to be useful</a></h2>
+
+<p>A standalone language model has to represent its prefix faithfully, because it alone answers for every token it emits. Anything it forgets becomes an error in the output.</p>
+
+<p>A drafter signs a gentler contract. The target verifies every proposal before a token is committed, and rejection sampling repairs any mistake exactly<a class="cite" href="#ref-1">[1]</a>. A wrong guess costs one extra round and never a wrong answer. So the drafter can afford a compressed, lossy view of the prefix, as long as that view keeps its guesses good enough to be accepted.</p>
+
+<p>That turns drafter design into a budgeting problem. With mean drafting and verification latencies <span class="m">T<sub class="r">draft</sub></span> and <span class="m">T<sub class="r">verify</sub></span>, and <span class="m">τ</span> tokens gained per round, the time per token is</p>
+
+<div class="eq" role="math" aria-label="L equals T draft plus T verify, over tau"><i>L</i> = <span class="frac"><span><i>T</i><sub class="r">draft</sub> + <i>T</i><sub class="r">verify</sub></span><span><i>τ</i></span></span><span class="tag">(1)</span></div>
+
+<p>Recent drafters have pushed hard on <span class="m">τ</span>. LongSpark goes after <span class="m">T<sub class="r">draft</sub></span> and fixes it to a constant. We call this principle <strong>fixed-cost drafting</strong>: a drafter keeps just enough context to propose well, at a cost that no longer depends on the prefix length.</p>
+</article>
+
+<article class="prose col">
+<h2 id="round"><a href="#round">One round of LongSpark</a></h2>
+
+<p>Every round has the same shape. The target verifies the proposed block in one forward pass, and that same pass refreshes three fixed-size views of the prefix. The drafter reads them, drafts the next block in one parallel pass, and hands it back. The only full-prefix operation in the loop is the verification the target runs anyway.</p>
+</article>
+
+<!-- ============ FIG 3: architecture ============ -->
+<figure class="fig wide" id="fig-arch">
+  <div class="panel">
+    <div class="scroll-x">
+      <svg id="arch" viewBox="0 18 720 424" role="img" aria-label="One LongSpark round. The target verifies the proposal in one forward pass; the same pass refreshes three fixed-size views: a boundary state from its hidden states, a recent window read from its KV cache, and a global summary that absorbs the new KV rows. The drafter drafts the block in one parallel pass, then a small sequential correction samples the tokens, which go back to the target."></svg>
+    </div>
+    <div class="arch-bar">
+      <div class="steps" role="group" aria-label="Round stage">
+        <button type="button" class="step-pill" data-s="0">1 · Verify</button>
+        <button type="button" class="step-pill" data-s="1">2 · Draft</button>
+        <button type="button" class="step-pill" data-s="2">3 · Correct and sample</button>
+      </div>
+      <button class="btn" id="a-play" type="button" aria-pressed="true">Pause</button>
+    </div>
+    <p class="narr" id="a-narr" aria-live="polite"></p>
+  </div>
+  <figcaption><span class="fn">Fig. 2</span>One LongSpark round. The target’s KV cache grows every round; the <span class="v-b">boundary state</span>, the <span class="v-w">recent window</span> and the <span class="v-s">global summary</span> keep their size. Click a stage to jump to it.</figcaption>
+</figure>
+
+<article class="prose col">
+<h2 id="views"><a href="#views">Three views of the prefix</a></h2>
+
+<p>LongSpark taps a few evenly spaced target layers and reads the prefix at three time scales:</p>
+
+<ul class="views-list">
+  <li><i class="dot" style="background:var(--vb)"></i><div><span class="v-b">Boundary state.</span> The target’s hidden states at the decoding boundary, fused into one conditioning vector <span class="m">c<sub>t</sub></span>. It anchors <em>where</em> generation is right now.</div></li>
+  <li><i class="dot" style="background:var(--vw)"></i><div><span class="v-w">Recent KV window.</span> The last <span class="m">W</span> KV rows of each tapped layer, read straight out of the target cache. It supplies token-level detail about the neighborhood being continued.</div></li>
+  <li><i class="dot" style="background:var(--vs)"></i><div><span class="v-s">Global context summary.</span> The whole prefix compressed into a fixed number of entries per layer and head. It keeps the drafter oriented toward everything beyond the window.</div></li>
+</ul>
+
+<p>Each drafter layer is paired with one tapped target layer, and it attends over a single concatenated context:</p>
+
+<div class="eq" role="math" aria-label="K equals K block, K window, G; V equals V block, V window, M t"><b class="r">K</b> = [ <b class="r">K</b><sup class="r">b</sup> ; <span style="color:var(--vw)"><b class="r">K</b><sup class="r">w</sup></span> ; <span style="color:var(--vs)"><b class="r">G</b></span> ],&emsp; <b class="r">V</b> = [ <b class="r">V</b><sup class="r">b</sup> ; <span style="color:var(--vw)"><b class="r">V</b><sup class="r">w</sup></span> ; <span style="color:var(--vs)"><b class="r">M</b><sub><i>t</i></sub></span> ]<span class="tag">(2)</span></div>
+
+<p>The drafter’s attention context therefore has <strong>the same size at 1K tokens and at 128K</strong>.</p>
+
+<h3 id="summary"><a href="#summary">A summary that never re-reads the prefix</a></h3>
+
+<p>The summary has to compress an ever-growing prefix into a fixed number of entries, and keep doing so cheaply as tokens are committed. LongSpark gives each tapped layer and head a bank of <span class="m">R</span> learned queries <span class="m"><b class="r">G</b></span> ∈ ℝ<sup><i>R</i>×<i>d</i></sup> and lets them attend over the target’s keys and values:</p>
+
+<div class="eq" role="math" aria-label="M t equals attention of G over K 1 to t and V 1 to t"><span style="color:var(--vs)"><b class="r">M</b><sub><i>t</i></sub></span> = Attn( <span style="color:var(--vs)"><b class="r">G</b></span>, <b class="r">K</b><sub>1:<i>t</i></sub>, <b class="r">V</b><sub>1:<i>t</i></sub> )<span class="tag">(3)</span></div>
+
+<p>The queries are trained with the drafter and frozen at inference, so past attention contributions never go stale. Each query stores one value vector and one log-normalizer; after verification it merges in only the rows just committed. The same queries then act as the drafter’s summary <em>keys</em>, reading back what they wrote.</p>
+
+<div class="eq" role="math" aria-label="lambda prime equals log of exp lambda plus exp lambda delta; M prime equals exp of lambda minus lambda prime times M plus exp of lambda delta minus lambda prime times M delta"><i>λ</i>′ = log( e<sup><i>λ</i></sup> + e<sup><i>λ</i><sub>Δ</sub></sup> ),&emsp; <b class="r">M</b>′ = e<sup><i>λ</i>−<i>λ</i>′</sup> <b class="r">M</b> + e<sup><i>λ</i><sub>Δ</sub>−<i>λ</i>′</sup> <b class="r">M</b><sub>Δ</sub><span class="tag">(4)</span></div>
+
+<p>The update never looks at the old prefix, and it gives exactly what recomputing attention from scratch would.</p>
+
+<h2 id="correct"><a href="#correct">Parallel draft, sequential polish</a></h2>
+
+<p>The backbone sees every slot of the block at once, so the backbone and the vocabulary projection run in a single parallel pass. Tokens sampled independently from that pass can disagree with one another, so LongSpark adds a DSpark-style low-rank correction that lets each position see the token sampled just before it:</p>
+
+<div class="eq" role="math" aria-label="z i equals z i zero plus W c E c of y i minus 1"><b class="r">z</b><sub><i>i</i></sub> = <b class="r">z</b><sub><i>i</i></sub><sup>(0)</sup> + <b class="r">W</b><sub>c</sub> <b class="r">E</b><sub>c</sub>(<i>y</i><sub><i>i</i>−1</sub>),&emsp; <i>q</i>(<i>y</i><sub>1:<i>B</i></sub> | <i>s</i>) = ∏<sub><i>i</i></sub> <i>q</i><sub><i>i</i></sub>(<i>y</i><sub><i>i</i></sub> | <i>s</i>, <i>y</i><sub><i>i</i>−1</sub>)<span class="tag">(5)</span></div>
+
+<p>Only this correction and the sampling step run sequentially, and both are tiny. These corrected distributions are exactly what the target verifies against, so the output distribution stays the target’s own. Training freezes the whole target and optimizes the drafter, the fusion and input maps, the summary queries, and the correction jointly on target-regenerated responses from <a href="https://huggingface.co/datasets/mlabonne/open-perfectblend">Open-PerfectBlend</a>.</p>
+
+<h2 id="results"><a href="#results">Results</a></h2>
+
+<h3 id="time"><a href="#time">Where the time goes</a></h3>
+
+<p>Break one round down and target verification dominates, at nearly the same cost whatever the drafter. What separates the drafters is everything around it, and there LongSpark is cheapest: its proposal takes 2.03&nbsp;ms against DSpark’s 4.59&nbsp;ms, and a full round 31.0&nbsp;ms against 34.5&nbsp;ms. A long answer takes thousands of rounds.</p>
+</article>
+
+<!-- ============ FIG 2 ============ -->
+<figure class="fig wide" id="fig-anatomy">
+  <div class="panel">
+    <div class="fig-head">
+      <div class="legend" aria-hidden="true">
+        <span><i style="background:var(--s1)"></i>Verify</span>
+        <span><i style="background:var(--s2)"></i>Proposal</span>
+        <span><i style="background:var(--s3)"></i>Sampling</span>
+        <span><i style="background:var(--s4)"></i>Update</span>
+      </div>
+    </div>
+    <svg id="ch-round" class="chart" viewBox="0 0 880 210" role="img" aria-label="Round latency breakdown at 32K context. Verify costs 26.6 to 27.4 ms for every drafter. Rounds total EAGLE-3 41.8 ms, DFlash 33.5, DSpark 34.5, LongSpark 31.0 ms. LongSpark's proposal is 2.03 ms versus DSpark's 4.59."></svg>
+  </div>
+  <figcaption><span class="fn">Fig. 3</span>One decoding round at 32K context on Qwen3-8B, target on a single GPU (TP1). Verification costs about the same for every drafter; LongSpark’s proposal is <strong>2.3×</strong> faster than DSpark’s.</figcaption>
+</figure>
+
+<article class="prose col">
+<h3 id="scales"><a href="#scales">Fastest at every scale</a></h3>
+
+<p>Across eight benchmarks in math, code, and chat, LongSpark posts the highest average throughput at every target size, and the lead grows with the target: <strong>1.88×</strong> on Qwen3-4B, <strong>1.99×</strong> on 8B, <strong>2.13×</strong> on 14B. DSpark accepts slightly longer blocks at every scale. LongSpark still wins, because it pays less for each one.</p>
+</article>
+
+<!-- ============ FIG 6 ============ -->
+<figure class="fig wide" id="fig-main">
+  <div class="panel">
+    <div class="fig-head">
+      <div class="seg" role="group" aria-label="Target model" id="main-seg">
+        <button type="button" data-k="4B">Qwen3-4B</button>
+        <button type="button" data-k="8B" aria-pressed="true">Qwen3-8B</button>
+        <button type="button" data-k="14B">Qwen3-14B</button>
+      </div>
+    </div>
+    <div class="dual">
+      <svg id="ch-tau" class="chart" viewBox="0 0 420 190" role="img" aria-label="Mean accepted length by drafter."></svg>
+      <svg id="ch-spd" class="chart" viewBox="0 0 420 190" role="img" aria-label="Mean throughput speedup over autoregressive decoding by drafter."></svg>
+    </div>
+    <details class="more">
+      <summary>Show all eight benchmarks</summary>
+      <div class="tbl-wrap"><table id="main-tbl"></table></div>
+    </details>
+  </div>
+  <figcaption><span class="fn">Fig. 4</span>Left: mean accepted length <span class="m">τ</span>. Right: throughput speedup over autoregressive decoding (dashed line = 1×). DSpark proposes more accepted tokens per round; LongSpark turns fewer of them into more throughput.</figcaption>
+</figure>
+
+<article class="prose col">
+<h3 id="load"><a href="#load">A wider lead under load</a></h3>
+
+<p>Serving systems rarely run at concurrency 1. As we raise concurrency from 8 to 128 on <a href="https://github.com/tatsu-lab/stanford_alpaca">Alpaca</a>, <a href="https://huggingface.co/datasets/google-research-datasets/mbpp">MBPP</a>, and <a href="https://huggingface.co/datasets/HuggingFaceH4/MATH-500">MATH-500</a>, the drafter’s work multiplies with the batch, and a cheaper drafter matters more. LongSpark starts level with DSpark at C8, overtakes it by C16, and pulls ahead steadily at every scale. By C128 it leads by <strong>+12.0%</strong> on 4B, <strong>+7.8%</strong> on 8B, and <strong>+6.0%</strong> on 14B.</p>
+</article>
+
+<figure class="fig wide" id="fig-conc">
+  <div class="panel">
+    <svg id="ch-conc" class="chart" viewBox="0 0 880 280" role="img" aria-label="Throughput gain of LongSpark over DSpark versus concurrency. At C8 all sizes are within 2.1% of parity; at C128 gains are 12.0% on 4B, 7.8% on 8B and 6.0% on 14B." style="width:100%;height:auto;display:block"></svg>
+  </div>
+  <figcaption><span class="fn">Fig. 5</span>LongSpark’s throughput gain over DSpark as concurrency grows. Hover a point for per-benchmark gains.</figcaption>
+</figure>
+
+<article class="prose col">
+<h3 id="long"><a href="#long">Lowest TPOT at long context</a></h3>
+
+<p>From 32K to 128K tokens, LongSpark delivers the highest throughput and the lowest time-per-output-token on all three long-context workloads. On <a href="https://huggingface.co/datasets/Hehy/CodeSpan">CodeSpan</a> at 64K, it beats DSpark, the strongest competitor, by <strong>29.1%</strong> in throughput and cuts TPOT by <strong>23.1%</strong>. At 128K on <a href="https://huggingface.co/datasets/Steefano/LCB">LongSWE-Bench</a>, where every other drafter sits within a few milliseconds of plain decoding, LongSpark brings TPOT from 97.2&nbsp;ms down to <strong>74.3&nbsp;ms</strong>.</p>
+</article>
+
+<figure class="fig wide" id="fig-long">
+  <div class="panel">
+    <div class="tbl-wrap" style="margin-top:0">
+      <table>
+        <caption><span class="fn">Table 1</span>Long-context decoding on Qwen3-8B. TPS in tokens/s (↑), TPOT in ms/token (↓).</caption>
+        <thead>
+          <tr class="grp"><th></th><th colspan="2"><a href="https://huggingface.co/datasets/sail/longspec-data">LongSpec</a> 32K</th><th colspan="2"><a href="https://huggingface.co/datasets/Hehy/CodeSpan">CodeSpan</a> 64K</th><th colspan="2"><a href="https://huggingface.co/datasets/Steefano/LCB">LongSWE</a> 128K</th></tr>
+          <tr><th>Method</th><th>TPS ↑</th><th>TPOT ↓</th><th>TPS ↑</th><th>TPOT ↓</th><th>TPS ↑</th><th>TPOT ↓</th></tr>
+        </thead>
+        <tbody id="long-body"></tbody>
+      </table>
+    </div>
+  </div>
+</figure>
+
+<article class="prose col">
+<h3 id="ablation"><a href="#ablation">Every view pulls its weight</a></h3>
+
+<p>Take away any one view, retrain, and acceptance drops in every domain. The recent window carries the most: without it, <span class="m">τ</span> falls from 4.69 to 3.71. The summary and the boundary state each still add 0.3 to 0.4 tokens per round.</p>
+</article>
+
+<figure class="fig wide" id="fig-abl">
+  <div class="panel">
+    <div class="tbl-wrap" style="margin-top:0">
+      <table>
+        <caption><span class="fn">Table 2</span>Mean accepted length <span class="m">τ</span> on Qwen3-8B with one view removed.</caption>
+        <thead><tr><th>Variant</th><th>Math</th><th>Code</th><th>Chat</th><th>Avg.</th></tr></thead>
+        <tbody>
+          <tr class="me"><td>LongSpark</td><td>5.33</td><td>4.91</td><td>3.40</td><td><b>4.69</b></td></tr>
+          <tr><td>w/o global summary</td><td>4.99</td><td>4.50</td><td>3.17</td><td>4.35 <span class="sp">−0.34</span></td></tr>
+          <tr><td>w/o boundary state</td><td>4.90</td><td>4.42</td><td>3.15</td><td>4.28 <span class="sp">−0.41</span></td></tr>
+          <tr><td>w/o recent window</td><td>4.17</td><td>3.82</td><td>2.86</td><td>3.71 <span class="sp">−0.98</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</figure>
+
+<article class="prose col">
+<h2 id="bottom"><a href="#bottom">The bottom line</a></h2>
+
+<p>A drafter and a target have different jobs. The target needs the full, exact state of the prefix to guarantee correctness. The drafter needs only enough orientation to guess well. LongSpark builds on that asymmetry: a boundary state for position, a recent window for detail, a global summary for everything else, all fixed in size and all read from work the target has already done.</p>
+
+<p>The result is a drafter whose cost is a flat fee per round. At short contexts, that fee already buys the best throughput we measured. At long contexts, where every other drafter’s fee keeps rising, the gap only grows.</p>
+
+<p>Code and weights for Qwen3-4B, 8B, and 14B are <a href="https://github.com/Hao-Yuan-He/LongSpark">on GitHub</a> and <a href="https://huggingface.co/collections/Hehy/longspark">on Hugging Face</a>. We would love to hear what you build with them.</p>
+
+<p class="closing">Read the prefix once. Draft at a fixed price.</p>
+
+<h2 id="cite"><a href="#cite">Citation</a></h2>
+<div class="bib-wrap">
+<button class="btn" id="bib-copy" type="button">Copy</button>
+<pre class="bib" id="bib">@misc{he2026longsparkblog,
+  title        = {LongSpark: Drafting at a Fixed Cost},
+  author       = {He, Hao-Yuan and Liu, Peng-Fei},
+  year         = {2026},
+  month        = sep,
+  howpublished = {Blog post},
+  url          = {https://long-spark.github.io/}
+}</pre>
+</div>
+
+<section class="footnotes" aria-label="Notes">
+<ol>
+  <li>All speculative methods run in a target–drafter disaggregated setup: one dedicated drafter GPU is added to the target GPUs used by autoregressive decoding. Seven draft tokens per round, thinking mode disabled.</li>
+  <li>Baselines: EAGLE-3<a class="cite" href="#ref-3">[3]</a> (autoregressive), DFlash<a class="cite" href="#ref-4">[4]</a> and DSpark<a class="cite" href="#ref-2">[2]</a> (parallel block drafters), each trained for the matching Qwen3 target. Long-context runs use fixed NTK scaling<a class="cite" href="#ref-5">[5]</a> with α = 4.</li>
+  <li>The drafter’s persistent state is the global summary, <span class="m">O(|𝓛| H R d)</span>. The recent window is read in place from the target cache, and block KV is discarded after every round.</li>
+</ol>
+<p class="refs-h">References</p>
+<ol class="refs">
+  <li id="ref-1">Y. Leviathan, M. Kalman, Y. Matias. <em>Fast inference from transformers via speculative decoding.</em> ICML 2023.</li>
+  <li id="ref-2">X. Cheng et al. <em><a href="https://arxiv.org/abs/2607.05147">DSpark: Confidence-scheduled speculative decoding with semi-autoregressive generation.</a></em> arXiv:2607.05147, 2026.</li>
+  <li id="ref-3">Y. Li, F. Wei, C. Zhang, H. Zhang. <em>EAGLE-3: Scaling up inference acceleration of large language models via training-time test.</em> NeurIPS 2025.</li>
+  <li id="ref-4">J. Chen, Y. Liang, Z. Liu. <em>DFlash: Block diffusion for flash speculative decoding.</em> ICML 2026.</li>
+  <li id="ref-5">bloc97. <em><a href="https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/">NTK-aware scaled RoPE allows LLaMA models to have extended context length.</a></em> 2023.</li>
+</ol>
+</section>
+</article>
+
+<footer class="site">
+  <span>LongSpark · 2026</span>
+  <span>Correspondence: <span class="mail">hehy@lamda.nju.edu.cn</span></span>
+</footer>
+</main>
+
+<div class="tooltip" id="tip" role="tooltip"></div>
+
+<script>
+(() => {
+'use strict';
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (s, r = document) => r.querySelector(s);
+const S = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const H = (tag, cls, parent, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const fmt = (n, d = 0) => n.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+const kLabel = n => n >= 1024 ? (n / 1024) + 'K' : String(n);
+
+/* ---------- theme ---------- */
+const root = document.documentElement;
+const themeBtn = $('#theme');
+function setTheme(t) {
+  if (t === 'dark') root.dataset.theme = 'dark'; else root.dataset.theme = 'light';
+  themeBtn.setAttribute('aria-pressed', String(t === 'dark'));
+  themeBtn.setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+}
+let saved = null;
+try { saved = localStorage.getItem('ls-theme'); } catch (e) {}
+setTheme(saved === 'dark' ? 'dark' : 'light');
+themeBtn.addEventListener('click', () => {
+  const t = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  setTheme(t);
+  try { localStorage.setItem('ls-theme', t); } catch (e) {}
+});
+
+/* ---------- outline ---------- */
+(() => {
+  const heads = [...document.querySelectorAll('.prose h2[id]')].filter(h => h.id !== 'cite');
+  const list = $('#toc');
+  const top = H('a', '', H('li', '', list), 'Introduction'); top.href = '#top';
+  const links = heads.map(h => {
+    const a = H('a', '', H('li', '', list), h.textContent);
+    a.href = '#' + h.id;
+    return a;
+  });
+  const onScroll = () => {
+    let k = -1;
+    heads.forEach((h, i) => { if (h.getBoundingClientRect().top < 140) k = i; });
+    links.forEach((a, i) => a.classList.toggle('on', i === k));
+    top.classList.toggle('on', k === -1);
+  };
+  addEventListener('scroll', onScroll, {passive: true});
+  onScroll();
+})();
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip');
+function showTip(html, ev) {
+  tip.innerHTML = html;
+  tip.classList.add('on');
+  moveTip(ev);
+}
+function moveTip(ev) {
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - pad;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { tip.classList.remove('on'); }
+function bindTip(el, html) {
+  el.addEventListener('pointerenter', e => showTip(typeof html === 'function' ? html() : html, e));
+  el.addEventListener('pointermove', moveTip);
+  el.addEventListener('pointerleave', hideTip);
+}
+
+/* ============ FIG 1: context scaling (measured, Qwen3-8B TP4 C16) ============ */
+const PREFIX = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072];
+const LAT = {
+  ds: [3.917, 4.014, 4.169, 4.465, 5.066, 6.322, 8.769, 13.754],
+  ls: [3.576, 3.556, 3.546, 3.541, 3.631, 3.502, 3.502, 3.635],
+};
+const LS_MIB = 6.298828125;
+const dsMib = t => 20 * t / 1024;
+const lerpAt = (arr, v) => {
+  const i = Math.min(Math.floor(v), arr.length - 2), f = v - i;
+  return arr[i] + (arr[i + 1] - arr[i]) * f;
+};
+
+function lineChart(svg, cfg) {
+  const W = 420, Hh = 230, m = {l: 42, r: 74, t: 26, b: 34};
+  const iw = W - m.l - m.r, ih = Hh - m.t - m.b;
+  const x = v => m.l + v / 7 * iw;
+  const y = cfg.log
+    ? val => m.t + ih - (Math.log10(val) - cfg.y0) / (cfg.y1 - cfg.y0) * ih
+    : val => m.t + ih - (val - cfg.y0) / (cfg.y1 - cfg.y0) * ih;
+  S('text', {x: m.l - 34, y: 12, class: 'ttl'}, svg).textContent = cfg.title;
+  cfg.yticks.forEach(t => {
+    const yy = y(t);
+    S('line', {x1: m.l, x2: m.l + iw, y1: yy, y2: yy, class: 'grid'}, svg);
+    S('text', {x: m.l - 6, y: yy + 3.5, 'text-anchor': 'end'}, svg).textContent = cfg.fmtY(t);
+  });
+  S('line', {x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, class: 'axis'}, svg);
+  PREFIX.forEach((p, i) => {
+    S('text', {x: x(i), y: m.t + ih + 16, 'text-anchor': 'middle'}, svg).textContent = kLabel(p);
+  });
+  S('text', {x: m.l + iw / 2, y: Hh - 2, 'text-anchor': 'middle'}, svg).textContent = 'prefix tokens (log scale)';
+  const series = cfg.series.map(s => {
+    const pts = s.vals.map((v, i) => [x(i), y(v)]);
+    S('polyline', {points: pts.map(p => p.join(',')).join(' '), fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, svg);
+    pts.forEach((p, i) => {
+      S('circle', {cx: p[0], cy: p[1], r: 3, fill: s.color, stroke: 'var(--card)', 'stroke-width': 1.5}, svg);
+    });
+    const last = pts[pts.length - 1];
+    S('text', {x: last[0] + 8, y: last[1] + 4 + (s.dy || 0), class: 'lbl', style: 'fill:var(--fg)'}, svg).textContent = s.name;
+    return s;
+  });
+  const cursor = S('g', {}, svg);
+  const cl = S('line', {y1: m.t, y2: m.t + ih, stroke: 'var(--fg)', 'stroke-width': 1, 'stroke-dasharray': '2 3', opacity: .5}, cursor);
+  const dots = series.map(s => S('circle', {r: 5, fill: 'var(--card)', stroke: s.color, 'stroke-width': 2}, cursor));
+  const lbls = series.map(() => S('text', {style: 'fill:var(--fg);font-weight:600', 'text-anchor': 'end'}, cursor));
+  // hover zone
+  const hit = S('rect', {x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', style: 'cursor:crosshair'}, svg);
+  hit.addEventListener('pointermove', ev => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) / r.width * W;
+    const i = Math.max(0, Math.min(7, Math.round((px - m.l) / iw * 7)));
+    showTip(`<b>${kLabel(PREFIX[i])} tokens</b><br>` + cfg.series.map(s => `${s.name}: ${cfg.fmtTip(s.vals[i])}`).join('<br>'), ev);
+  });
+  hit.addEventListener('pointerleave', hideTip);
+  return v => {
+    const xx = x(v);
+    cl.setAttribute('x1', xx); cl.setAttribute('x2', xx);
+    series.forEach((s, k) => {
+      const val = s.at(v), yy = y(val);
+      dots[k].setAttribute('cx', xx); dots[k].setAttribute('cy', yy);
+      const t = lbls[k];
+      t.textContent = cfg.fmtTip(val);
+      const left = xx > m.l + 60;
+      t.setAttribute('text-anchor', left ? 'end' : 'start');
+      t.setAttribute('x', left ? xx - 9 : xx + 9);
+      t.setAttribute('y', yy + (k === 0 ? -9 : 15));
+    });
+  };
+}
+
+const updLat = lineChart($('#ch-lat'), {
+  title: 'Drafting time (ms)', y0: 0, y1: 15, yticks: [0, 5, 10, 15], fmtY: t => t, fmtTip: v => v.toFixed(2) + ' ms',
+  series: [
+    {name: 'DSpark', vals: LAT.ds, color: 'var(--base)', at: v => lerpAt(LAT.ds, v)},
+    {name: 'LongSpark', vals: LAT.ls, color: 'var(--ls)', at: v => lerpAt(LAT.ls, v), dy: 4},
+  ],
+});
+const updMem = lineChart($('#ch-mem'), {
+  title: 'Drafter state per request (MiB)', log: true, y0: 0, y1: 4, yticks: [1, 10, 100, 1000, 10000], fmtY: t => t >= 1000 ? (t / 1000) + 'K' : t,
+  fmtTip: v => (v >= 100 ? fmt(v) : v.toFixed(2)) + ' MiB',
+  series: [
+    {name: 'DSpark', vals: PREFIX.map(dsMib), color: 'var(--base)', at: v => dsMib(1024 * 2 ** v)},
+    {name: 'LongSpark', vals: PREFIX.map(() => LS_MIB), color: 'var(--ls)', at: () => LS_MIB},
+  ],
+});
+
+
+const ctx = $('#ctx');
+function setCtx(v) {
+  const t = Math.round(1024 * 2 ** v);
+  const dl = lerpAt(LAT.ds, v), ll = lerpAt(LAT.ls, v), dm = dsMib(t);
+  $('#ctx-out').textContent = (t >= 10240 ? Math.round(t / 1024) : (t / 1024).toFixed(1)) + 'K';
+  $('#hl-state').textContent = Math.round(dm / LS_MIB) + '×';
+  $('#hl-lat').textContent = (dl / ll).toFixed(1) + '×';
+
+  updLat(v); updMem(v);
+}
+ctx.addEventListener('input', () => setCtx(+ctx.value));
+setCtx(7);
+let sweepRaf = null;
+$('#sweep').addEventListener('click', () => {
+  cancelAnimationFrame(sweepRaf);
+  if (reduced) { ctx.value = 7; setCtx(7); return; }
+  const t0 = performance.now(), dur = 3200;
+  const tick = now => {
+    const p = Math.min(1, (now - t0) / dur);
+    const v = 7 * (p < .5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2);
+    ctx.value = v; setCtx(v);
+    if (p < 1) sweepRaf = requestAnimationFrame(tick);
+  };
+  sweepRaf = requestAnimationFrame(tick);
+});
+
+/* ============ FIG 2: round anatomy (measured, TP1, rerun 2026-09-29) ============ */
+(() => {
+  const svg = $('#ch-round');
+  const rows = [
+    ['EAGLE-3', [27.434, 10.304, 1.021, 3.053], 41.812],
+    ['DFlash', [26.588, 4.526, 1.161, 1.257], 33.532],
+    ['DSpark', [26.945, 4.591, 1.509, 1.408], 34.453],
+    ['LongSpark', [26.792, 2.026, 1.505, 0.727], 31.049],
+  ];
+  const names = ['Verify', 'Proposal', 'Sampling', 'Update'];
+  const cols = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+  const W = innerWidth < 600 ? 560 : 880, m = {l: 92, r: 70, t: 8, b: 30}, bh = 26, gap = 18;
+  const iw = W - m.l - m.r, max = 45;
+  const x = v => m.l + v / max * iw;
+  const ih = rows.length * (bh + gap) - gap;
+  [0, 10, 20, 30, 40].forEach(t => {
+    S('line', {x1: x(t), x2: x(t), y1: m.t - 4, y2: m.t + ih + 4, class: 'grid'}, svg);
+    S('text', {x: x(t), y: m.t + ih + 20, 'text-anchor': 'middle'}, svg).textContent = t + (t === 40 ? ' ms' : '');
+  });
+  rows.forEach(([name, segs, total], r) => {
+    const y = m.t + r * (bh + gap);
+    const me = name === 'LongSpark';
+    S('text', {x: m.l - 10, y: y + bh / 2 + 4, 'text-anchor': 'end', class: 'lbl', style: me ? 'fill:var(--ls)' : ''}, svg).textContent = name;
+    let acc = 0;
+    segs.forEach((v, k) => {
+      const x0 = x(acc), w = x(acc + v) - x0;
+      const rect = S('rect', {x: x0 + (k ? 1 : 0), y, width: Math.max(0, w - (k ? 1 : 0) - 1), height: bh, fill: cols[k], rx: k === 3 ? 3 : 0}, svg);
+      bindTip(rect, `<b>${name} · ${names[k]}</b><br>${v.toFixed(2)} ms`);
+      if (k === 1 && w > 30) S('text', {x: x0 + w / 2, y: y + bh / 2 + 4, 'text-anchor': 'middle', style: 'fill:#fff;font-weight:600;pointer-events:none'}, svg).textContent = v.toFixed(1);
+      acc += v;
+    });
+    S('text', {x: x(acc) + 8, y: y + bh / 2 + 4, style: 'fill:var(--fg);font-weight:600'}, svg).textContent = total.toFixed(1) + ' ms';
+  });
+  svg.setAttribute('viewBox', `0 0 ${W} ${m.t + ih + m.b}`);
+})();
+
+/* ============ FIG 3: architecture, one decoding round ============ */
+(() => {
+  const svg = $('#arch');
+  const T = (x, y, txt, cls, extra = {}) => { const e = S('text', {x, y, class: cls || '', ...extra}, svg); e.textContent = txt; return e; };
+  const defs = S('defs', {}, svg);
+  const marker = (id, col) => {
+    const m = S('marker', {id, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse'}, defs);
+    S('path', {d: 'M0 0L10 5L0 10z', fill: col}, m);
+  };
+  marker('ah', 'var(--arrow)'); marker('ah-b', 'var(--vb)'); marker('ah-w', 'var(--vw)'); marker('ah-s', 'var(--vs)'); marker('ah-d', 'var(--ls)');
+
+  // panels
+  S('rect', {x: 8, y: 28, width: 214, height: 364, rx: 14, class: 'pn pn-t'}, svg);
+  S('rect', {x: 252, y: 28, width: 196, height: 364, rx: 14, class: 'pn'}, svg);
+  S('rect', {x: 478, y: 28, width: 234, height: 364, rx: 14, class: 'pn pn-d'}, svg);
+  T(24, 54, 'Target model', 't-h'); T(24, 69, 'reads the whole prefix', 't-s');
+  T(268, 54, 'Three views', 't-h'); T(268, 69, 'same size at any length', 't-s');
+  T(494, 54, 'LongSpark drafter', 't-h'); T(494, 69, 'fixed cost per round', 't-s');
+
+  // target: one decoder layer, repeated
+  S('rect', {x: 22, y: 84, width: 186, height: 142, rx: 10, fill: 'none', stroke: 'var(--base-2)', 'stroke-dasharray': '4 4'}, svg);
+  S('rect', {x: 150, y: 77, width: 50, height: 14, class: 'lbl-bg', fill: 'var(--soft)'}, svg);
+  T(175, 88, '× 36', 't-m', {'text-anchor': 'middle', style: 'fill:var(--fg)'});
+  const ffn = S('rect', {x: 36, y: 102, width: 158, height: 32, rx: 7, class: 'bx d'}, svg);
+  T(115, 122, 'FFN', 't-v', {'text-anchor': 'middle', style: 'fill:var(--fg);font-weight:500'});
+  const attn = S('rect', {x: 36, y: 154, width: 158, height: 32, rx: 7, class: 'bx d'}, svg);
+  T(115, 174, 'Causal self-attention', 't-v', {'text-anchor': 'middle', style: 'fill:var(--fg);font-weight:500'});
+  S('path', {d: 'M115 154V137', class: 'cn', 'marker-end': 'url(#ah)'}, svg);
+  // attention writes the KV cache
+  S('path', {d: 'M115 187V270', class: 'cn', 'marker-end': 'url(#ah)', 'stroke-dasharray': '2 3'}, svg);
+  const kv = [];
+  for (let i = 0; i < 28; i++) kv.push(S('rect', {x: 24 + i * 6.3, y: 274, width: 5.3, height: 14, rx: 1, class: 'kv'}, svg));
+  T(24, 306, 'KV cache', 't-m');
+  // prefix + proposal tokens
+  T(24, 334, 'prefix + proposal', 't-m');
+  [28, 42, 56, 70].forEach(x => S('circle', {cx: x, cy: 354, r: 4, class: 'pre'}, svg));
+  T(80, 357, '…', 't-m');
+  S('circle', {cx: 102, cy: 354, r: 5.5, class: 'tok tg'}, svg);
+  const toks = Array.from({length: 7}, (_, i) => S('circle', {cx: 116 + i * 14, cy: 354, r: 5.5, class: 'tok drafted'}, svg));
+
+  // the three views
+  const VIEWS = [
+    {k: 'b', y: 90, name: 'Boundary state cₜ', sub: 'where we are'},
+    {k: 'w', y: 172, name: 'Recent KV window', sub: 'recent, exact'},
+    {k: 's', y: 253, name: 'Global summary', sub: 'all, compressed'},
+  ];
+  const vbx = VIEWS.map(v => {
+    const r = S('rect', {x: 264, y: v.y, width: 172, height: 56, rx: 9, class: 'bx ' + v.k}, svg);
+    T(276, v.y + 23, v.name, 't-v', {style: `fill:var(--v${v.k})`});
+    T(276, v.y + 40, v.sub, 't-m');
+    return r;
+  });
+  const bsq = S('rect', {x: 412, y: 110, width: 16, height: 16, rx: 3, fill: 'var(--vb)'}, svg);
+  const wcells = Array.from({length: 6}, (_, i) => S('rect', {x: 390 + i * 6.8, y: 193, width: 5, height: 14, rx: 1, class: 'wcell'}, svg));
+  const svals = Array.from({length: 16}, (_, i) => .35 + .6 * Math.abs(Math.sin(i * 2.3 + 1)));
+  const scells = svals.map((v, i) => {
+    const c = S('rect', {x: 398 + (i % 4) * 9, y: 263 + Math.floor(i / 4) * 9, width: 7.5, height: 7.5, rx: 1.2, class: 'scell'}, svg);
+    c.style.opacity = v; return c;
+  });
+
+  // one verification pass feeds all three views:
+  // hidden states -> boundary state; KV cache -> window (read in place) and summary (absorbs new rows)
+  const ext = [
+    S('path', {d: 'M194 118H261', class: 'cn b', 'marker-end': 'url(#ah-b)'}, svg),
+    S('path', {d: 'M202 281H236V200H261', class: 'cn w', 'marker-end': 'url(#ah-w)'}, svg),
+    S('path', {d: 'M202 281H261', class: 'cn s', 'marker-end': 'url(#ah-s)'}, svg),
+  ];
+  const SX = i => 500 + i * 27.5;
+  const inj = [
+    S('path', {d: 'M436 118H497', class: 'cn b', 'marker-end': 'url(#ah-b)'}, svg),
+    S('path', {d: 'M436 281H466V200H491', class: 'cn s', 'marker-end': 'url(#ah-s)'}, svg),
+    S('path', {d: 'M436 200H491', class: 'cn w', 'marker-end': 'url(#ah-w)'}, svg),
+  ];
+  [inj[1], inj[2]] = [inj[2], inj[1]];
+  S('circle', {cx: 466, cy: 200, r: 2.5, fill: 'var(--vs)'}, svg);
+  T(466, 111, '+', 't-m', {'text-anchor': 'middle', style: 'fill:var(--vb);font-weight:600'});
+  T(451, 193, 'K,V', 't-m', {'text-anchor': 'middle', style: 'fill:var(--vw)'});
+  T(451, 274, 'K,V', 't-m', {'text-anchor': 'middle', style: 'fill:var(--vs)'});
+
+  // drafter: input slots
+  Array.from({length: 7}, (_, i) => {
+    S('rect', {x: SX(i), y: 105, width: 24, height: 26, rx: 5, class: 'slot ' + (i ? 'm' : 'a')}, svg);
+    T(SX(i) + 12, 118, i ? 'mask' : 'a', 'st ' + (i ? '' : 'a'), i ? {style: 'fill:var(--faint);font-size:7px'} : {});
+  });
+  S('path', {d: 'M595 132V145', class: 'cn d', 'marker-end': 'url(#ah-d)'}, svg);
+  // parallel backbone: one layer in detail, repeated
+  const bb = S('rect', {x: 494, y: 148, width: 202, height: 134, rx: 9, class: 'bx d'}, svg);
+  T(506, 166, 'Parallel backbone', 't-v', {style: 'fill:var(--fg)'});
+  T(684, 166, '× 5', 't-m', {'text-anchor': 'end', style: 'fill:var(--fg)'});
+  T(506, 184, 'bidirectional attention', 't-m');
+  T(506, 238, 'FFN', 't-m');
+  const bcs = [193, 246].map(y => Array.from({length: 7}, (_, i) => S('rect', {x: 506 + i * 26, y, width: 22, height: 14, rx: 3, class: 'bc'}, svg)));
+  S('path', {d: 'M595 282V297', class: 'cn d', 'marker-end': 'url(#ah-d)'}, svg);
+  // sequential correction + sampling
+  const cb = S('rect', {x: 494, y: 300, width: 202, height: 76, rx: 9, class: 'bx d'}, svg);
+  T(506, 319, 'Sequential correction', 't-v', {style: 'fill:var(--fg)'});
+  const links = [], outs = [], outT = [];
+  for (let i = 0; i < 7; i++) {
+    if (i) links.push(S('path', {d: `M${SX(i - 1) + 15} 337Q${SX(i) - 2} 328 ${SX(i) + 9} 337`, class: 'lnk'}, svg));
+    outs.push(S('rect', {x: SX(i), y: 338, width: 24, height: 26, rx: 5, class: 'slot y'}, svg));
+    outT.push(T(SX(i) + 12, 351, 'y' + '₁₂₃₄₅₆₇'[i], 'st y'));
+  }
+  // proposal loop back to the target
+  const loop = S('path', {d: 'M595 376V424H158V372', class: 'cn d', 'marker-end': 'url(#ah-d)'}, svg);
+  S('rect', {x: 340, y: 416, width: 74, height: 16, class: 'lbl-bg', fill: 'var(--card)'}, svg);
+  T(377, 428, 'proposal', 't-m', {'text-anchor': 'middle', style: 'fill:var(--ls)'});
+
+  // ---------- animation ----------
+  const fx = S('g', {}, svg);
+  let gen = 0;
+  function travel(path, color, n = 3, dur = 800, gap = 150) {
+    if (reduced) return;
+    const g = gen, L = path.getTotalLength();
+    for (let k = 0; k < n; k++) {
+      const c = S('circle', {r: 3.2, fill: color, opacity: 0}, fx);
+      const t0 = performance.now() + k * gap;
+      const tick = now => {
+        if (g !== gen) { c.remove(); return; }
+        const p = (now - t0) / dur;
+        if (p >= 1) { c.remove(); return; }
+        if (p >= 0) {
+          const pt = path.getPointAtLength(L * (p < .5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2));
+          c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y); c.setAttribute('opacity', 1);
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+  // illustrative acceptance per round
+  const ROUNDS = [6, 7, 3];
+  let ri = 0, stage = 2, playing = !reduced, visible = false, timers = [], loopT = null, tick = 0;
+  const later = (fn, ms) => timers.push(setTimeout(fn, reduced ? 0 : ms));
+  const pills = [...$('#fig-arch').querySelectorAll('.step-pill')];
+  const narr = $('#a-narr');
+  const NARR = [
+    r => `<b>Verify.</b> The target checks the whole block in one forward pass, keeps the accepted run and adds ${r === 7 ? 'a bonus token' : 'its own correction'}. The same pass refreshes all three views: the boundary state from its hidden states, the recent window read in place from the KV cache, and the summary, which absorbs only the new rows.`,
+    () => `<b>Draft.</b> The committed token and the masked slots go through the backbone in one parallel pass. Each layer is paired with a tapped target layer and reads a context whose size never depends on the prefix.`,
+    () => `<b>Correct and sample.</b> A low-rank correction lets each position see the token sampled just before it. This is the only sequential step, and it is tiny. The block then goes back to the target.`,
+  ];
+  const setLive = (els, on) => els.forEach(e => e.classList.toggle('live', on && !reduced));
+  const allCn = [...ext, ...inj, loop];
+  const clearOuts = () => {
+    outs.forEach(o => o.setAttribute('class', 'slot y')); outT.forEach(o => o.classList.remove('on'));
+    links.forEach(l => l.classList.remove('on'));
+  };
+
+  function render(s, instant) {
+    timers.forEach(clearTimeout); timers = []; gen++;
+    stage = s;
+    const r = ROUNDS[ri];
+    svg.dataset.stage = s;
+    pills.forEach((p, i) => p.classList.toggle('on', i === s));
+    narr.innerHTML = NARR[s](r);
+    setLive(allCn, false);
+    vbx.forEach(b => b.classList.remove('hot')); bb.classList.remove('hot'); cb.classList.remove('hot');
+    [ffn, attn].forEach(e => e.classList.remove('hot'));
+    const d = instant ? () => 0 : ms => ms;
+
+    if (s === 0) {
+      clearOuts();
+      bcs.forEach(row => row.forEach(c => c.classList.remove('on')));
+      [ffn, attn].forEach(e => e.classList.add('hot'));
+      toks.forEach((c, i) => later(() => {
+        c.setAttribute('class', 'tok ' + (i < r ? 'ok' : i === r ? 'no' : 'drafted off'));
+        if (i === r) later(() => c.setAttribute('class', 'tok tg'), 420);
+      }, d(150 + i * 140)));
+      // the same pass writes new KV rows and refreshes every view at once
+      later(() => {
+        kv.forEach((c, i) => c.classList.toggle('new', i >= 28 - (r + 1)));
+        setLive(ext, true); vbx.forEach(b => b.classList.add('hot'));
+        ext.forEach((p, k) => travel(p, `var(--v${VIEWS[k].k})`));
+        tick++;
+        wcells.forEach((c, i) => c.classList.toggle('new', i >= 6 - Math.min(3, r + 1)));
+        scells.forEach((c, i) => { svals[i] = Math.min(.95, Math.max(.3, svals[i] + Math.sin(tick * 2.1 + i * 1.7) * .2)); c.style.opacity = svals[i]; });
+        bsq.animate?.([{opacity: .3}, {opacity: 1}], {duration: reduced ? 1 : 500});
+      }, d(150 + 7 * 140 + 150));
+      later(() => wcells.forEach(c => c.classList.remove('new')), d(2800));
+    }
+    if (s === 1) {
+      clearOuts();
+      setLive(inj, true); bb.classList.add('hot');
+      inj.forEach((p, k) => travel(p, `var(--v${VIEWS[k].k})`, 3, 650));
+      bcs.forEach(row => row.forEach(c => c.classList.remove('on')));
+      bcs.forEach((row, j) => later(() => row.forEach(c => c.classList.add('on')), d(500 + j * 260)));
+    }
+    if (s === 2) {
+      cb.classList.add('hot');
+      bcs.forEach(row => row.forEach(c => c.classList.add('on')));
+      outs.forEach((o, i) => later(() => {
+        o.setAttribute('class', 'slot y on'); outT[i].classList.add('on');
+        if (i) links[i - 1].classList.add('on');
+      }, d(200 + i * 220)));
+      if (!instant) {
+        later(() => { setLive([loop], true); travel(loop, 'var(--ls)', 7, 1300, 90); }, 1800);
+        later(() => toks.forEach(c => c.setAttribute('class', 'tok drafted')), 3300);
+      }
+    }
+  }
+  function advance() {
+    if (stage < 2) return render(stage + 1);
+    ri = (ri + 1) % ROUNDS.length;
+    render(0);
+  }
+  const DUR = [3600, 2600, 3800];
+  function schedule() {
+    clearTimeout(loopT);
+    if (playing && visible) loopT = setTimeout(() => { advance(); schedule(); }, DUR[stage]);
+  }
+  function setPlaying(p) {
+    playing = p;
+    $('#a-play').textContent = p ? 'Pause' : 'Play';
+    $('#a-play').setAttribute('aria-pressed', String(p));
+    schedule();
+  }
+  $('#a-play').addEventListener('click', () => setPlaying(!playing));
+  pills.forEach((p, i) => p.addEventListener('click', () => { setPlaying(false); render(i); }));
+  // resting frame: the drafted block, ready to propose
+  render(2, true);
+  new IntersectionObserver(es => { visible = es[0].isIntersecting; if (!visible) clearTimeout(loopT); else schedule(); }, {threshold: .3}).observe(svg);
+  setPlaying(playing);
+})();
+
+/* ============ FIG 6: main results (Table 1 of the paper) ============ */
+(() => {
+  const BENCH = ['GSM8K', 'MATH-500', 'AIME25', 'MBPP', 'HumanEval', 'LCB', 'MT-Bench', 'Alpaca', 'Avg.'];
+  const D = {
+    '4B': {
+      'EAGLE-3': [[5.15,1.36],[4.60,1.35],[3.84,1.24],[3.69,1.03],[4.15,1.17],[3.77,1.14],[2.42,0.72],[2.26,0.69],[3.74,1.09]],
+      'DFlash': [[5.37,1.81],[4.89,1.89],[4.01,1.72],[4.40,1.55],[4.74,1.72],[4.23,1.61],[3.05,1.18],[2.94,1.14],[4.20,1.58]],
+      'DSpark': [[6.10,1.99],[5.72,2.14],[4.92,2.05],[5.14,1.73],[5.44,1.91],[4.92,1.79],[3.65,1.36],[3.55,1.32],[4.93,1.79]],
+      'LongSpark': [[5.90,2.08],[5.52,2.28],[4.67,2.17],[5.01,1.84],[5.12,1.97],[4.63,1.86],[3.52,1.46],[3.46,1.42],[4.73,1.88]],
+    },
+    '8B': {
+      'EAGLE-3': [[5.26,1.49],[4.75,1.50],[4.02,1.37],[3.92,1.16],[4.32,1.30],[4.17,1.28],[2.67,0.85],[2.54,0.82],[3.96,1.22]],
+      'DFlash': [[5.36,1.96],[4.91,2.02],[4.07,1.83],[4.36,1.66],[4.67,1.82],[4.44,1.68],[3.09,1.28],[3.00,1.24],[4.24,1.69]],
+      'DSpark': [[6.17,2.17],[5.80,2.32],[4.99,2.19],[5.18,1.89],[5.48,2.06],[5.09,1.84],[3.69,1.47],[3.59,1.42],[5.00,1.92]],
+      'LongSpark': [[5.93,2.24],[5.57,2.42],[4.72,2.27],[5.03,1.98],[5.16,2.11],[4.83,1.88],[3.53,1.54],[3.46,1.49],[4.78,1.99]],
+    },
+    '14B': {
+      'EAGLE-3': [[5.22,1.69],[4.62,1.63],[3.82,1.44],[3.81,1.29],[4.11,1.41],[4.01,1.35],[2.61,0.93],[2.49,0.90],[3.84,1.33]],
+      'DFlash': [[5.37,2.16],[4.86,2.17],[4.01,1.91],[4.45,1.85],[4.57,1.94],[4.35,1.72],[3.09,1.38],[2.96,1.33],[4.21,1.81]],
+      'DSpark': [[6.19,2.43],[5.77,2.53],[4.93,2.32],[5.25,2.12],[5.41,2.24],[4.97,1.88],[3.67,1.61],[3.56,1.56],[4.97,2.09]],
+      'LongSpark': [[6.03,2.47],[5.63,2.61],[4.76,2.37],[5.14,2.18],[5.15,2.25],[4.78,1.90],[3.57,1.65],[3.48,1.60],[4.82,2.13]],
+    },
+  };
+  const METHODS = ['EAGLE-3', 'DFlash', 'DSpark', 'LongSpark'];
+
+  function hbar(svg, title, vals, max, ticks, fmtV, ref) {
+    svg.innerHTML = '';
+    const W = 420, m = {l: 92, r: 50, t: 26, b: 26}, bh = 22, gap = 12;
+    const iw = W - m.l - m.r, ih = METHODS.length * (bh + gap) - gap;
+    const x = v => m.l + v / max * iw;
+    S('text', {x: 0, y: 12, class: 'ttl'}, svg).textContent = title;
+    ticks.forEach(t => {
+      S('line', {x1: x(t), x2: x(t), y1: m.t - 4, y2: m.t + ih + 4, class: 'grid'}, svg);
+      S('text', {x: x(t), y: m.t + ih + 18, 'text-anchor': 'middle'}, svg).textContent = t;
+    });
+    if (ref != null) S('line', {x1: x(ref), x2: x(ref), y1: m.t - 6, y2: m.t + ih + 6, stroke: 'var(--fg)', 'stroke-dasharray': '3 3', opacity: .6}, svg);
+    const best = Math.max(...vals);
+    METHODS.forEach((meth, i) => {
+      const y = m.t + i * (bh + gap), me = meth === 'LongSpark';
+      S('text', {x: m.l - 8, y: y + bh / 2 + 4, 'text-anchor': 'end', class: 'lbl', style: me ? 'fill:var(--ls)' : ''}, svg).textContent = meth;
+      const w = x(vals[i]) - m.l;
+      const r = S('rect', {x: m.l, y, width: Math.max(0, w), height: bh, fill: me ? 'var(--ls)' : 'var(--base-2)', rx: 0}, svg);
+      // rounded data end only
+      S('rect', {x: m.l + Math.max(0, w - 4), y, width: 4, height: bh, rx: 3, fill: me ? 'var(--ls)' : 'var(--base-2)'}, svg);
+      bindTip(r, `<b>${meth}</b><br>${title}: ${fmtV(vals[i])}`);
+      S('text', {x: x(vals[i]) + 6, y: y + bh / 2 + 4, style: `fill:var(--fg);font-weight:${vals[i] === best ? 700 : 400}`}, svg).textContent = fmtV(vals[i]);
+    });
+    svg.setAttribute('viewBox', `0 0 ${W} ${m.t + ih + m.b}`);
+  }
+  function table(k) {
+    const tb = $('#main-tbl');
+    tb.innerHTML = '';
+    const th = H('thead', '', tb), tr = H('tr', '', th);
+    H('th', '', tr, 'Drafter');
+    BENCH.forEach(b => H('th', '', tr, b));
+    const body = H('tbody', '', tb);
+    const bestSp = BENCH.map((_, j) => Math.max(...METHODS.map(mm => D[k][mm][j][1])));
+    METHODS.forEach(mm => {
+      const r = H('tr', mm === 'LongSpark' ? 'me' : '', body);
+      H('td', '', r, mm);
+      D[k][mm].forEach(([tau, sp], j) => {
+        const td = H('td', '', r);
+        td.append(document.createTextNode(tau.toFixed(2) + ' '));
+        H('span', 'sp' + (sp === bestSp[j] ? ' best' : ''), td, `(${sp.toFixed(2)}×)`);
+      });
+    });
+  }
+  function setK(k) {
+    const avg = METHODS.map(mm => D[k][mm][8]);
+    hbar($('#ch-tau'), 'Accepted length τ', avg.map(a => a[0]), 6, [0, 2, 4, 6], v => v.toFixed(2));
+    hbar($('#ch-spd'), 'Throughput speedup', avg.map(a => a[1]), 2.5, [0, 0.5, 1, 1.5, 2, 2.5], v => v.toFixed(2) + '×', 1);
+    table(k);
+    document.querySelectorAll('#main-seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === k)));
+  }
+  document.querySelectorAll('#main-seg button').forEach(b => b.addEventListener('click', () => setK(b.dataset.k)));
+  setK('8B');
+})();
+
+/* ============ FIG 7: concurrency (measured, 3-seed) ============ */
+(() => {
+  const svg = $('#ch-conc');
+  const C = [8, 16, 32, 64, 128];
+  const SER = [
+    {name: 'Qwen3-4B', color: 'var(--c4b)', v: [-0.19, 2.96, 5.98, 9.08, 11.99],
+      per: {'MATH-500': [-0.02, 2.72, 6.27, 9.22, 11.97], MBPP: [-0.21, 2.81, 5.12, 8.23, 11.80], Alpaca: [-0.35, 3.36, 6.57, 9.79, 12.22]}},
+    {name: 'Qwen3-8B', color: 'var(--c8b)', v: [-2.07, 0.56, 4.10, 7.15, 7.81],
+      per: {'MATH-500': [-1.90, 0.87, 4.23, 7.46, 7.93], MBPP: [-1.84, 0.15, 4.27, 6.80, 7.90], Alpaca: [-2.48, 0.66, 3.81, 7.17, 7.61]}},
+    {name: 'Qwen3-14B', color: 'var(--c14b)', v: [-1.09, 1.13, 3.14, 4.72, 6.04],
+      per: {'MATH-500': [-1.84, 1.60, 2.98, 4.33, 6.18], MBPP: [-0.39, 0.64, 2.91, 4.64, 5.36], Alpaca: [-1.05, 1.16, 3.52, 5.18, 6.59]}},
+  ];
+  const W = innerWidth < 600 ? 520 : 880, Hh = innerWidth < 600 ? 300 : 280, m = {l: 50, r: 110, t: 14, b: 38};
+  svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
+  const iw = W - m.l - m.r, ih = Hh - m.t - m.b;
+  const x = i => m.l + i / (C.length - 1) * iw;
+  const y0 = -4, y1 = 13;
+  const y = v => m.t + ih - (v - y0) / (y1 - y0) * ih;
+  [-4, 0, 4, 8, 12].forEach(t => {
+    S('line', {x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t), class: t === 0 ? 'axis' : 'grid', style: t === 0 ? 'stroke:var(--fg);opacity:.55' : ''}, svg);
+    S('text', {x: m.l - 8, y: y(t) + 3.5, 'text-anchor': 'end'}, svg).textContent = (t > 0 ? '+' : '') + t + '%';
+  });
+  C.forEach((c, i) => S('text', {x: x(i), y: m.t + ih + 18, 'text-anchor': 'middle'}, svg).textContent = 'C' + c);
+  S('text', {x: m.l + iw / 2, y: Hh - 4, 'text-anchor': 'middle'}, svg).textContent = 'concurrent requests';
+  const labelY = [];
+  SER.forEach(s => {
+    const pts = s.v.map((v, i) => [x(i), y(v)]);
+    S('polyline', {points: pts.map(p => p.join(',')).join(' '), fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round'}, svg);
+    pts.forEach((p, i) => {
+      S('circle', {cx: p[0], cy: p[1], r: 4, fill: s.color, stroke: 'var(--card)', 'stroke-width': 2}, svg);
+      const hit = S('circle', {cx: p[0], cy: p[1], r: 12, fill: 'transparent'}, svg);
+      bindTip(hit, `<b>${s.name} · C${C[i]}</b><br>mean ${(s.v[i] > 0 ? '+' : '') + s.v[i].toFixed(2)}%<br>` +
+        Object.entries(s.per).map(([k, a]) => `${k}: ${(a[i] > 0 ? '+' : '') + a[i].toFixed(2)}%`).join('<br>'));
+    });
+    labelY.push(pts[pts.length - 1][1]);
+  });
+  // direct labels at the right end, nudged apart
+  const ord = labelY.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]);
+  for (let k = 1; k < ord.length; k++) if (ord[k][0] - ord[k - 1][0] < 16) ord[k][0] = ord[k - 1][0] + 16;
+  ord.forEach(([yy, i]) => {
+    const s = SER[i];
+    S('text', {x: m.l + iw + 12, y: yy + 4, class: 'lbl'}, svg).textContent = `${s.name.replace('Qwen3-', '')}  +${s.v[4].toFixed(1)}%`;
+    S('rect', {x: m.l + iw + 12 + 0, y: yy + 7, width: 20, height: 2, fill: s.color}, svg);
+  });
+})();
+
+/* ============ Table 1: long-context ============ */
+(() => {
+  const rows = [
+    ['Vanilla', [1128.9, 14.0, 884.4, 17.8, 160.5, 97.2]],
+    ['EAGLE-3', [1258.5, 12.5, 1071.8, 14.7, 158.7, 97.4]],
+    ['DFlash', [1313.7, 12.0, 919.1, 17.2, 163.6, 94.6]],
+    ['DSpark', [1736.6, 9.0, 1217.3, 13.0, 190.9, 81.4]],
+    ['LongSpark', [1917.6, 8.2, 1571.8, 10.0, 212.7, 74.3]],
+  ];
+  const body = $('#long-body');
+  const maxTps = [0, 2, 4].map(j => Math.max(...rows.map(r => r[1][j])));
+  rows.forEach(([name, v]) => {
+    const tr = H('tr', name === 'LongSpark' ? 'me' : '', body);
+    H('td', '', tr, name);
+    v.forEach((val, j) => {
+      const td = H('td', '', tr);
+      const best = name === 'LongSpark';
+      const t = H(best ? 'b' : 'span', '', td, val.toFixed(1));
+      if (j % 2 === 0) {
+        const bar = H('span', 'tcell-bar', td);
+        bar.style.width = (val / maxTps[j / 2] * 64) + 'px';
+      }
+    });
+  });
+})();
+
+/* ---------- copy bibtex ---------- */
+$('#bib-copy').addEventListener('click', e => {
+  const b = e.currentTarget, txt = $('#bib').textContent;
+  const done = ok => { b.textContent = ok ? 'Copied' : 'Select & copy'; setTimeout(() => { b.textContent = 'Copy'; }, 1600); };
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => done(true), () => { selectBib(); done(false); });
+  else { selectBib(); done(false); }
+});
+function selectBib() { const r = document.createRange(); r.selectNodeContents($('#bib')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+})();
+</script>
+</body>
+</html>
