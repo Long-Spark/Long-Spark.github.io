@@ -296,7 +296,6 @@ footer.site .mail{font-family:var(--mono);user-select:all;color:var(--muted)}
     LongSpark
   </a>
   <div class="nav-links">
-    <!-- TODO: replace with the arXiv abstract URL once assigned -->
     <a href="https://arxiv.org/abs/2609.37029">Paper</a>
     <a href="https://github.com/Hao-Yuan-He/LongSpark">Code</a>
     <a href="https://huggingface.co/collections/Hehy/longspark">Weights</a>
@@ -311,10 +310,14 @@ footer.site .mail{font-family:var(--mono);user-select:all;color:var(--muted)}
 
 <main id="top">
 <header class="post col">
-  <div class="kicker">September 28, 2026</div>
+  <div class="kicker">September 28, 2026 · Updated October 26, 2026</div>
   <h1>LongSpark: drafting at a fixed cost</h1>
   <div class="byline">
-    <b>Hao-Yuan He</b><sup>*</sup>, <b>Peng-Fei Liu</b><sup>*</sup>, <b>Si Shen</b>, <b>Ming Li</b>
+    <b>Hao-Yuan He</b><sup>1,2,*</sup>, <b>Peng-Fei Liu</b><sup>4,*</sup>, <b>Chen Chen</b><sup>4</sup>, <b>Si Shen</b><sup>2,3</sup>,
+    <b>Quan He</b><sup>4</sup>, <b>Runzhou Liu</b><sup>4</sup>, <b>Xinqi Li</b><sup>4</sup>, <b>Zhenhua Dong</b><sup>4</sup>, <b>Ming Li</b><sup>1,2</sup>
+    <br><span><sup>1</sup>School of Artificial Intelligence, Nanjing University<br>
+    <sup>2</sup>National Key Laboratory for Novel Software Technology, Nanjing University<br>
+    <sup>3</sup>School of Computer Science, Nanjing University · <sup>4</sup>Huawei Foundation Model Dept</span>
     <br><span style="color:var(--faint)"><sup>*</sup>Equal contribution</span>
   </div>
   <div class="res">
@@ -327,9 +330,9 @@ footer.site .mail{font-family:var(--mono);user-select:all;color:var(--muted)}
 <article class="prose col">
 <p>Speculative decoding<a class="cite" href="#ref-1">[1]</a> strikes a simple bargain. A small drafter guesses a block of tokens, the target checks all of them in one forward pass, and every accepted guess is a token the target never had to produce on its own. The bargain pays exactly as long as guessing stays cheap.</p>
 
-<p>On long contexts, guessing quietly stops being cheap. Today’s strongest drafters read the entire prefix every round. At 32K tokens, DSpark<a class="cite" href="#ref-2">[2]</a> spends <strong>6.3&nbsp;ms</strong> drafting each block; at 128K it spends <strong>13.8&nbsp;ms</strong>, while its drafter state swells from 640&nbsp;MiB to <strong>2.5&nbsp;GiB per request</strong>. The drafter inherits the very <span class="m">O(t)</span> scaling it was meant to hide.</p>
+<p>On long contexts, guessing quietly stops being cheap. Full-attention drafters read the entire prefix every round. At 32K tokens, full-attention DSpark<a class="cite" href="#ref-2">[2]</a> spends <strong>6.3&nbsp;ms</strong> drafting each block; at 128K it spends <strong>13.8&nbsp;ms</strong>, while its drafter state swells from 640&nbsp;MiB to <strong>2.5&nbsp;GiB per request</strong>. The drafter inherits the very <span class="m">O(t)</span> scaling it was meant to hide.</p>
 
-<p><strong>LongSpark</strong> removes that scaling entirely. It reads the prefix through three fixed-size views of the target’s own verification pass, so its drafting time sits near <strong>3.5&nbsp;ms</strong> from 1K to 128K tokens and its context state stays at <strong>6.3&nbsp;MiB</strong>, a <strong>406× reduction</strong> over DSpark at 128K. End to end, it delivers <strong>1.88×–2.13×</strong> throughput speedups on Qwen3-4B, 8B, and 14B, and the <strong>lowest time-per-output-token</strong> on every long-context workload we tested.</p>
+<p><strong>LongSpark</strong> removes that scaling entirely. It reads the prefix through three fixed-size views of the target’s own verification pass, so its drafting time sits near <strong>3.5&nbsp;ms</strong> from 1K to 128K tokens and its context state stays at <strong>6.3&nbsp;MiB</strong>, a <strong>406× reduction</strong> over full-attention DSpark at 128K. End to end, it delivers <strong>1.88×–2.13×</strong> throughput speedups on Qwen3-4B, 8B, and 14B, and the <strong>lowest time-per-output-token</strong> on every long-context workload we tested.</p>
 </article>
 
 <!-- ============ FIG 1 ============ -->
@@ -346,11 +349,11 @@ footer.site .mail{font-family:var(--mono);user-select:all;color:var(--muted)}
       <span>Drafting: <b id="hl-lat">3.8×</b> faster</span>
     </div>
     <div class="charts2">
-      <svg id="ch-lat" class="chart" viewBox="0 0 420 230" role="img" aria-label="Drafting time (proposal plus sampling) versus prefix length. DSpark rises from 3.9 to 13.8 ms; LongSpark stays between 3.5 and 3.6 ms."></svg>
-      <svg id="ch-mem" class="chart" viewBox="0 0 420 230" role="img" aria-label="Drafter context state versus prefix length on a log scale. DSpark grows linearly from 20 to 2560 MiB; LongSpark stays at 6.3 MiB."></svg>
+      <svg id="ch-lat" class="chart" viewBox="0 0 420 230" role="img" aria-label="Drafting time (proposal plus sampling) versus prefix length. Full-attention DSpark rises from 3.9 to 13.8 ms; LongSpark stays between 3.5 and 3.6 ms."></svg>
+      <svg id="ch-mem" class="chart" viewBox="0 0 420 230" role="img" aria-label="Drafter context state versus prefix length on a log scale. Full-attention DSpark grows linearly from 20 to 2560 MiB; LongSpark stays at 6.3 MiB."></svg>
     </div>
   </div>
-  <figcaption><span class="fn">Fig. 1</span>Drag the prefix length. DSpark’s drafting time (proposal plus sampling) and state grow with the prefix; LongSpark’s stay flat. Measured on Qwen3-8B, target on four GPUs (TP4).</figcaption>
+  <figcaption><span class="fn">Fig. 1</span>Drag the prefix length. Full-attention DSpark’s drafting time (proposal plus sampling) and state grow with the prefix; LongSpark’s stay flat. Measured on Qwen3-8B, target on four GPUs (TP4). DSpark denotes the full-attention baseline here; the sliding-window variant is compared <a href="#sliding">below</a>.</figcaption>
 </figure>
 
 <article class="prose col">
@@ -538,11 +541,38 @@ footer.site .mail{font-family:var(--mono);user-select:all;color:var(--muted)}
 </figure>
 
 <article class="prose col">
+<h3 id="sliding"><a href="#sliding">A fixed cost without losing the distant prefix</a></h3>
+
+<p>A sliding window also keeps drafting cost fixed, but drops the distant prefix. We compare LongSpark with DSpark-SWA, the released DSpark checkpoint restricted to a <strong>256-token window at inference</strong>, matching LongSpark’s recent window.</p>
+
+<p>LongSpark keeps the whole prefix in view and achieves higher accepted length and throughput than DSpark-SWA across all four workload groups below.</p>
+</article>
+
+<figure class="fig wide" id="fig-swa">
+  <div class="panel">
+    <div class="tbl-wrap" style="margin-top:0">
+      <table>
+        <caption><span class="fn">Table 3</span>Qwen3-8B: mean accepted length <span class="m">τ</span> and throughput (TPS, tokens/s), higher is better. Main benchmarks averages the eight math, code, and chat benchmarks.</caption>
+        <thead>
+          <tr class="grp"><th></th><th colspan="2">Main benchmarks</th><th colspan="2">LongSpec 32K</th><th colspan="2">CodeSpan 64K</th><th colspan="2">LongSWE 128K</th></tr>
+          <tr><th>Method</th><th>τ ↑</th><th>TPS ↑</th><th>τ ↑</th><th>TPS ↑</th><th>τ ↑</th><th>TPS ↑</th><th>τ ↑</th><th>TPS ↑</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>DSpark</td><td><b>5.00</b></td><td>6741.4</td><td><b>3.36</b></td><td>1736.6</td><td>2.81</td><td>1217.3</td><td>1.87</td><td>190.9</td></tr>
+          <tr><td>DSpark-SWA</td><td>4.72</td><td>6474.9</td><td>2.93</td><td>1714.6</td><td>2.80</td><td>1373.6</td><td>2.33</td><td>196.3</td></tr>
+          <tr class="me"><td>LongSpark</td><td>4.78</td><td><b>6987.2</b></td><td>3.23</td><td><b>1917.6</b></td><td><b>3.47</b></td><td><b>1571.8</b></td><td><b>2.49</b></td><td><b>212.7</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</figure>
+
+<article class="prose col">
 <h2 id="bottom"><a href="#bottom">The bottom line</a></h2>
 
 <p>A drafter and a target have different jobs. The target needs the full, exact state of the prefix to guarantee correctness. The drafter needs only enough orientation to guess well. LongSpark builds on that asymmetry: a boundary state for position, a recent window for detail, a global summary for everything else, all fixed in size and all read from work the target has already done.</p>
 
-<p>The result is a drafter whose cost is a flat fee per round. At short contexts, that fee already buys the best throughput we measured. At long contexts, where every other drafter’s fee keeps rising, the gap only grows.</p>
+<p>The result is a drafter whose cost is a flat fee per round. At short contexts, that fee already buys the best throughput we measured. At long contexts, its fixed-size views preserve information beyond the recent window without adding prefix-dependent drafting work.</p>
 
 <p>Code and weights for Qwen3-4B, 8B, and 14B are <a href="https://github.com/Hao-Yuan-He/LongSpark">on GitHub</a> and <a href="https://huggingface.co/collections/Hehy/longspark">on Hugging Face</a>. We would love to hear what you build with them.</p>
 
@@ -553,7 +583,7 @@ footer.site .mail{font-family:var(--mono);user-select:all;color:var(--muted)}
 <button class="btn" id="bib-copy" type="button">Copy</button>
 <pre class="bib" id="bib">@misc{he2026longspark,
   title         = {LongSpark: Efficient speculative decoding with a fixed-cost parallel drafter},
-  author        = {He, Hao-Yuan and Liu, Peng-Fei and Shen, Si and Li, Ming},
+  author        = {He, Hao-Yuan and Liu, Peng-Fei and Chen, Chen and Shen, Si and He, Quan and Liu, Runzhou and Li, Xinqi and Dong, Zhenhua and Li, Ming},
   year          = {2026},
   eprint        = {2609.37029},
   archivePrefix = {arXiv},
